@@ -1,0 +1,41 @@
+[CmdletBinding()]
+param()
+
+$ErrorActionPreference = "Stop"
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$logDir = Join-Path $repoRoot "logs"
+$logFile = Join-Path $logDir "watch-docs.log"
+$watchScript = Join-Path $PSScriptRoot "watch-docs.ps1"
+$mutexName = "__TASK_NAME__Watcher"
+$mutex = $null
+$hasHandle = $false
+
+try {
+    New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+
+    $mutex = New-Object System.Threading.Mutex($false, $mutexName)
+    $hasHandle = $mutex.WaitOne(0, $false)
+    if (-not $hasHandle) {
+        Add-Content -Path $logFile -Value "[$(Get-Date -Format s)] Watcher already running. Exiting."
+        exit 0
+    }
+
+    Start-Transcript -Path $logFile -Append | Out-Null
+    Set-Location $repoRoot
+    $env:ASTRO_TELEMETRY_DISABLED = "1"
+    & $watchScript
+}
+finally {
+    try {
+        Stop-Transcript | Out-Null
+    } catch {
+    }
+
+    if ($hasHandle -and $mutex) {
+        $mutex.ReleaseMutex() | Out-Null
+    }
+
+    if ($mutex) {
+        $mutex.Dispose()
+    }
+}

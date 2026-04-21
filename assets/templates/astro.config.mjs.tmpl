@@ -1,0 +1,22 @@
+// @ts-check
+import { defineConfig } from 'astro/config';
+import starlight from '@astrojs/starlight';
+import { docsSources } from './scripts/docs-sources.mjs';
+
+export default defineConfig({
+  site: '__SITE_URL__',
+  integrations: [
+    starlight({
+      title: '__HUB_TITLE__',
+      description: 'Live preview hub for project documents, visuals, diagrams, and working artifacts.',
+      defaultLocale: 'root',
+      locales: {
+        root: { label: 'Korean', lang: 'ko' },
+      },
+      sidebar: docsSources.map((source) => ({
+        label: source.label,
+        autogenerate: { directory: source.slug },
+      })),
+    }),
+  ],
+});

@@ -1,0 +1,74 @@
+[CmdletBinding()]
+param(
+    [string]$CommitMessagePrefix = "preview: sync",
+    [switch]$SkipPush
+)
+
+$ErrorActionPreference = "Stop"
+$repoRoot = Split-Path -Parent $PSScriptRoot
+
+function Invoke-Step {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$Arguments
+    )
+
+    & $FilePath @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Command failed with exit code ${LASTEXITCODE}: $FilePath $($Arguments -join ' ')"
+    }
+}
+
+function Get-CommandOutput {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$Arguments
+    )
+
+    $result = & $FilePath @Arguments 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "Command failed with exit code ${LASTEXITCODE}: $FilePath $($Arguments -join ' ')`n$($result | Out-String)"
+    }
+
+    return ($result | Out-String).Trim()
+}
+
+Set-Location $repoRoot
+$env:ASTRO_TELEMETRY_DISABLED = "1"
+
+Write-Host "[preview-sync] Collecting project artifacts..." -ForegroundColor Cyan
+Invoke-Step npm.cmd run collect
+
+$statusBeforeAdd = Get-CommandOutput git status --short
+if ([string]::IsNullOrWhiteSpace($statusBeforeAdd)) {
+    Write-Host "[preview-sync] No changes detected after collect." -ForegroundColor Yellow
+    exit 0
+}
+
+Write-Host "[preview-sync] Staging changes..." -ForegroundColor Cyan
+Invoke-Step git add .
+
+$stagedChanges = Get-CommandOutput git diff --cached --name-only
+if ([string]::IsNullOrWhiteSpace($stagedChanges)) {
+    Write-Host "[preview-sync] Nothing staged after collect." -ForegroundColor Yellow
+    exit 0
+}
+
+$timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+$commitMessage = "$CommitMessagePrefix $timestamp"
+
+Write-Host "[preview-sync] Creating commit: $commitMessage" -ForegroundColor Cyan
+Invoke-Step git commit -m $commitMessage
+
+if (-not $SkipPush) {
+    Write-Host "[preview-sync] Pushing to origin/main..." -ForegroundColor Cyan
+    Invoke-Step git push
+}
+
+Write-Host "[preview-sync] Done." -ForegroundColor Green

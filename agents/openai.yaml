@@ -1,0 +1,4 @@
+interface:
+  display_name: "Project Preview Hub"
+  short_description: "Scaffold or repair a preview hub"
+  default_prompt: "Use $project-preview-hub to create or fix a Starlight-based preview hub for project artifacts."

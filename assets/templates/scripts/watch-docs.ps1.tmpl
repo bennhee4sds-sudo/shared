@@ -1,0 +1,116 @@
+[CmdletBinding()]
+param(
+    [int]$DebounceSeconds = 2,
+    [int]$FullSyncIntervalMinutes = 5,
+    [string]$CommitMessagePrefix = "preview: sync"
+)
+
+$ErrorActionPreference = "Stop"
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$syncScript = Join-Path $PSScriptRoot "sync-docs.ps1"
+$projectsRoot = "__PROJECTS_ROOT__"
+$ignoredPrefixes = @(
+    (Join-Path $projectsRoot "__HUB_REPO_NAME__"),
+    (Join-Path $projectsRoot "_starlight-template")
+)
+
+$script:pendingSync = $false
+$script:lastEventAt = Get-Date
+$script:lastFullSyncAt = Get-Date
+$watchers = @()
+$eventSubscriptions = @()
+
+function Test-IgnoredPath {
+    param(
+        [string]$Path
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return $false
+    }
+
+    foreach ($prefix in $ignoredPrefixes) {
+        if ($Path.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+    }
+
+    return $Path -match '\\(\.git|node_modules|dist|build|coverage|\.next|\.astro|\.turbo)(\\|$)'
+}
+
+function Register-Watch {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        Write-Host "[watch] Skipping missing path: $Path" -ForegroundColor Yellow
+        return
+    }
+
+    $watcher = New-Object System.IO.FileSystemWatcher
+    $watcher.Path = $Path
+    $watcher.IncludeSubdirectories = $true
+    $watcher.EnableRaisingEvents = $true
+    $watcher.NotifyFilter = [System.IO.NotifyFilters]'FileName, DirectoryName, LastWrite, Size, CreationTime'
+
+    $action = {
+        $changedPath = $Event.SourceEventArgs.FullPath
+        if (Test-IgnoredPath $changedPath) {
+            return
+        }
+
+        $script:lastEventAt = Get-Date
+        if (-not $script:pendingSync) {
+            Write-Host "[preview-watch] Change detected at $changedPath. Waiting for more edits..." -ForegroundColor Cyan
+        }
+        $script:pendingSync = $true
+    }
+
+    $script:watchers += $watcher
+    $script:eventSubscriptions += Register-ObjectEvent -InputObject $watcher -EventName Changed -Action $action
+    $script:eventSubscriptions += Register-ObjectEvent -InputObject $watcher -EventName Created -Action $action
+    $script:eventSubscriptions += Register-ObjectEvent -InputObject $watcher -EventName Deleted -Action $action
+    $script:eventSubscriptions += Register-ObjectEvent -InputObject $watcher -EventName Renamed -Action $action
+    Write-Host "[preview-watch] Watching $Path" -ForegroundColor Green
+}
+
+Register-Watch -Path $projectsRoot
+
+Write-Host "[preview-watch] Project Preview Hub auto-sync is running. Press Ctrl+C to stop." -ForegroundColor Green
+Write-Host "[preview-watch] A fallback full sync will run every $FullSyncIntervalMinutes minute(s)." -ForegroundColor DarkGray
+
+function Invoke-PreviewSync {
+    Write-Host "[preview-watch] Syncing project artifacts..." -ForegroundColor Cyan
+    powershell -ExecutionPolicy Bypass -File $syncScript -CommitMessagePrefix $CommitMessagePrefix
+    $script:lastFullSyncAt = Get-Date
+}
+
+Invoke-PreviewSync
+
+try {
+    while ($true) {
+        Start-Sleep -Seconds 1
+
+        if ($script:pendingSync -and ((Get-Date) - $script:lastEventAt).TotalSeconds -ge $DebounceSeconds) {
+            $script:pendingSync = $false
+            Invoke-PreviewSync
+        }
+
+        if (((Get-Date) - $script:lastFullSyncAt).TotalMinutes -ge $FullSyncIntervalMinutes) {
+            Write-Host "[preview-watch] Running scheduled fallback sync..." -ForegroundColor DarkGray
+            Invoke-PreviewSync
+        }
+    }
+}
+finally {
+    foreach ($subscription in $script:eventSubscriptions) {
+        Unregister-Event -SourceIdentifier $subscription.Name -ErrorAction SilentlyContinue
+        Remove-Job -Id $subscription.Id -Force -ErrorAction SilentlyContinue
+    }
+
+    foreach ($watcher in $script:watchers) {
+        $watcher.Dispose()
+    }
+}

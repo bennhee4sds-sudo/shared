@@ -1,0 +1,366 @@
+import { cp, mkdir, readFile, writeFile, readdir, rm, stat } from 'fs/promises';
+import { join, dirname, basename, relative } from 'path';
+import { fileURLToPath } from 'url';
+import { docsSources } from './docs-sources.mjs';
+
+const projectRoot = dirname(fileURLToPath(import.meta.url));
+const docsBase = join(projectRoot, '..', 'src', 'content', 'docs');
+const utf8Decoder = new TextDecoder('utf-8', { fatal: false });
+const eucKrDecoder = new TextDecoder('euc-kr', { fatal: false });
+const imageExtensions = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp']);
+const videoExtensions = new Set(['.mp4', '.webm', '.mov']);
+const pdfExtensions = new Set(['.pdf']);
+const markdownExtensions = new Set(['.md', '.mdx']);
+const diagramExtensions = new Set(['.drawio', '.mmd', '.mermaid', '.puml', '.plantuml', '.erd', '.dbml', '.excalidraw', '.vsdx']);
+const artifactExtensions = new Set(['.pptx', '.ppt', '.key', '.xlsx', '.xls', '.csv', '.docx', '.doc', '.txt', '.fig', '.sketch', '.json']);
+const ignoredNames = new Set([
+  '.git',
+  '.idea',
+  '.next',
+  '.nuxt',
+  '.astro',
+  '.turbo',
+  '.vscode',
+  'coverage',
+  'dist',
+  'build',
+  'node_modules',
+  'out',
+  'tmp',
+  'temp',
+]);
+
+function toPosixPath(value) {
+  return value.replace(/\\/g, '/');
+}
+
+function escapeHtml(value) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function escapeQuote(value) {
+  return value.replace(/"/g, '\\"');
+}
+
+function buildRelativeLink(filePath) {
+  return encodeURI(`./${toPosixPath(filePath)}`).replace(/#/g, '%23');
+}
+
+function isIgnoredPath(sourcePath, sourceRoot) {
+  const rel = relative(sourceRoot, sourcePath);
+  if (!rel) return false;
+  const parts = rel.split(/[\\/]+/).filter(Boolean);
+  return parts.some((part) => ignoredNames.has(part));
+}
+
+function stripBom(value) {
+  return value.replace(/^\uFEFF/, '');
+}
+
+function countMatches(value, pattern) {
+  return (value.match(pattern) || []).length;
+}
+
+function getEncodingScore(value) {
+  return {
+    hangul: countMatches(value, /[\uac00-\ud7a3]/g),
+    replacement: countMatches(value, /\uFFFD/g),
+    questionJunk: countMatches(value, /\?[^\s]/g),
+    weirdCjk: countMatches(value, /[留泥諛곌꼍媛怨좉컼]/g),
+  };
+}
+
+function chooseBestDecoding(buffer) {
+  const utf8 = stripBom(utf8Decoder.decode(buffer));
+  const eucKr = stripBom(eucKrDecoder.decode(buffer));
+  const utf8Score = getEncodingScore(utf8);
+  const eucKrScore = getEncodingScore(eucKr);
+
+  const utf8Penalty = (utf8Score.replacement * 4) + (utf8Score.questionJunk * 2) + utf8Score.weirdCjk;
+  const eucKrPenalty = (eucKrScore.replacement * 4) + (eucKrScore.questionJunk * 2) + eucKrScore.weirdCjk;
+  const utf8Value = (utf8Score.hangul * 3) - utf8Penalty;
+  const eucKrValue = (eucKrScore.hangul * 3) - eucKrPenalty;
+
+  if (eucKrValue > utf8Value + 3) {
+    return { text: eucKr, encoding: 'euc-kr' };
+  }
+
+  return { text: utf8, encoding: 'utf-8' };
+}
+
+function looksBrokenKorean(value) {
+  return /�|\?[^\s]|[留泥諛곌꼍媛怨좉컼]/.test(value);
+}
+
+async function readTextFileNormalized(filePath) {
+  const buffer = await readFile(filePath);
+  const result = chooseBestDecoding(buffer);
+  if (result.encoding !== 'utf-8') {
+    console.log(`[encoding] Normalized ${filePath} from ${result.encoding} to utf-8`);
+  } else if (looksBrokenKorean(result.text)) {
+    console.warn(`[encoding] Warning: suspicious text remains in ${filePath}. Please verify source encoding.`);
+  }
+  return result.text;
+}
+
+async function ensureTitle(filePath) {
+  const content = await readTextFileNormalized(filePath);
+  const filename = basename(filePath).replace(/\.mdx?$/i, '');
+
+  if (content.startsWith('---')) {
+    const end = content.indexOf('---', 3);
+    if (end === -1) return;
+    if (content.slice(3, end).includes('title:')) return;
+
+    const nameMatch = content.slice(3, end).match(/^name:\s*(.+)$/m);
+    const title = nameMatch ? nameMatch[1].trim() : filename;
+    const rest = content.slice(end + 3).replace(/^\s*\r?\n/, '');
+    const cleanedRest = rest.replace(new RegExp(`^#\\s+${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\r?\\n\\r?\\n?`, 'i'), '');
+    await writeFile(filePath, `---\ntitle: "${escapeQuote(title)}"\n${content.slice(3, end)}---\n\n${cleanedRest}`, 'utf-8');
+    return;
+  }
+
+  const h1Match = content.match(/^#\s+(.+)$/m);
+  const title = (h1Match ? h1Match[1].trim() : filename).replace(/"/g, "'");
+  const cleanedContent = h1Match ? content.replace(/^#\s+.+\r?\n\r?\n?/, '') : content;
+  await writeFile(filePath, `---\ntitle: "${escapeQuote(title)}"\n---\n\n${cleanedContent}`, 'utf-8');
+}
+
+async function ensureTitlesInDir(dir) {
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+
+  for (const entry of entries) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      await ensureTitlesInDir(full);
+    } else if (/\.mdx?$/i.test(entry.name)) {
+      await ensureTitle(full);
+    }
+  }
+}
+
+async function collectArtifacts(dir, rootDir, bucket = []) {
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return bucket;
+  }
+
+  for (const entry of entries) {
+    const full = join(dir, entry.name);
+    if (isIgnoredPath(full, rootDir)) {
+      continue;
+    }
+
+    if (entry.isDirectory()) {
+      await collectArtifacts(full, rootDir, bucket);
+      continue;
+    }
+
+    const relPath = toPosixPath(relative(rootDir, full));
+    if (!relPath || relPath === 'dochub-preview.mdx' || relPath === 'index.mdx') {
+      continue;
+    }
+
+    const extension = relPath.includes('.') ? `.${relPath.split('.').pop().toLowerCase()}` : '';
+    const lowerPath = relPath.toLowerCase();
+    bucket.push({
+      path: relPath,
+      name: basename(relPath),
+      extension,
+      isMarkdown: markdownExtensions.has(extension) && basename(relPath).toLowerCase() !== 'dochub-preview.mdx',
+      isImage: imageExtensions.has(extension),
+      isPdf: pdfExtensions.has(extension),
+      isVideo: videoExtensions.has(extension),
+      isDiagram: diagramExtensions.has(extension) || /(^|\/)(erd|wireframe|persona|customer-journey|journey|flow|storyboard|mockup|site-map|sitemap|service-blueprint)/i.test(lowerPath),
+      isArtifact: artifactExtensions.has(extension),
+    });
+  }
+
+  return bucket;
+}
+
+async function pruneMissingEntries(sourceDir, targetDir) {
+  let targetEntries;
+  try {
+    targetEntries = await readdir(targetDir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+
+  let sourceNames = new Set();
+  try {
+    const sourceEntries = await readdir(sourceDir, { withFileTypes: true });
+    sourceNames = new Set(sourceEntries.map((entry) => entry.name));
+  } catch {
+    sourceNames = new Set();
+  }
+
+  for (const entry of targetEntries) {
+    const targetPath = join(targetDir, entry.name);
+    const sourcePath = join(sourceDir, entry.name);
+
+    if (!sourceNames.has(entry.name)) {
+      await rm(targetPath, { recursive: true, force: true });
+      continue;
+    }
+
+    if (entry.isDirectory()) {
+      await pruneMissingEntries(sourcePath, targetPath);
+    }
+  }
+}
+
+function renderPreviewPage(label, artifacts) {
+  const markdownFiles = artifacts.filter((artifact) => artifact.isMarkdown);
+  const imageFiles = artifacts.filter((artifact) => artifact.isImage).slice(0, 12);
+  const pdfFiles = artifacts.filter((artifact) => artifact.isPdf).slice(0, 6);
+  const videoFiles = artifacts.filter((artifact) => artifact.isVideo).slice(0, 4);
+  const diagramFiles = artifacts.filter((artifact) => artifact.isDiagram && !artifact.isImage && !artifact.isPdf);
+  const otherArtifacts = artifacts.filter((artifact) => artifact.isArtifact && !artifact.isDiagram);
+
+  const sections = [
+    '---',
+    `title: "${escapeQuote(label)} Preview"`,
+    'description: Auto-generated preview page for project artifacts.',
+    'sidebar:',
+    '  hidden: true',
+    '---',
+    '',
+    'This page is generated automatically from the project folder and is meant to help preview the latest working artifacts in one place.',
+    '',
+    '## Snapshot',
+    '',
+    `- Total files mirrored: ${artifacts.length}`,
+    `- Markdown docs: ${markdownFiles.length}`,
+    `- Images: ${artifacts.filter((artifact) => artifact.isImage).length}`,
+    `- PDFs: ${artifacts.filter((artifact) => artifact.isPdf).length}`,
+    `- Diagram or wireframe files: ${artifacts.filter((artifact) => artifact.isDiagram).length}`,
+    '',
+  ];
+
+  if (imageFiles.length > 0) {
+    sections.push('## Image Previews', '');
+    for (const artifact of imageFiles) {
+      const link = buildRelativeLink(artifact.path);
+      sections.push(`### ${artifact.name}`, '', `![${escapeHtml(artifact.name)}](${link})`, '');
+    }
+  }
+
+  if (pdfFiles.length > 0) {
+    sections.push('## PDF Previews', '');
+    for (const artifact of pdfFiles) {
+      const link = buildRelativeLink(artifact.path);
+      sections.push(`### ${artifact.name}`, '', `<iframe src="${link}" title="${escapeHtml(artifact.name)}" style={{ width: '100%', height: '640px', border: '1px solid #d1d5db', borderRadius: '12px' }} />`, '', `[Open ${artifact.name}](${link})`, '');
+    }
+  }
+
+  if (videoFiles.length > 0) {
+    sections.push('## Video Previews', '');
+    for (const artifact of videoFiles) {
+      const link = buildRelativeLink(artifact.path);
+      sections.push(`### ${artifact.name}`, '', `<video controls src="${link}" style={{ width: '100%', maxHeight: '480px', borderRadius: '12px' }} />`, '');
+    }
+  }
+
+  if (diagramFiles.length > 0) {
+    sections.push('## Diagram And Design Files', '');
+    for (const artifact of diagramFiles) {
+      const link = buildRelativeLink(artifact.path);
+      sections.push(`- [${artifact.path}](${link})`);
+    }
+    sections.push('');
+  }
+
+  if (otherArtifacts.length > 0) {
+    sections.push('## Other Project Artifacts', '');
+    for (const artifact of otherArtifacts) {
+      const link = buildRelativeLink(artifact.path);
+      sections.push(`- [${artifact.path}](${link})`);
+    }
+    sections.push('');
+  }
+
+  if (markdownFiles.length > 0) {
+    sections.push('## Markdown Docs Found', '');
+    for (const artifact of markdownFiles) {
+      sections.push(`- ${artifact.path}`);
+    }
+    sections.push('', 'Use the sidebar to open the mirrored markdown pages directly.');
+  } else {
+    sections.push('## Notes', '', 'No Markdown docs were found yet. This preview page will still show images, PDFs, diagrams, and other artifact files copied from the project folder.');
+  }
+
+  return `${sections.join('\n')}\n`;
+}
+
+async function syncProjectSource(source) {
+  const dest = join(docsBase, source.slug);
+  const tempDest = join(docsBase, `${source.slug}.__sync__`);
+  await stat(source.src);
+  await mkdir(dirname(dest), { recursive: true });
+  await rm(tempDest, { recursive: true, force: true });
+
+  await cp(source.src, tempDest, {
+    recursive: true,
+    force: true,
+    filter: (src) => !isIgnoredPath(src, source.src),
+  });
+
+  await rm(join(tempDest, 'dochub-preview.mdx'), { force: true });
+  const artifacts = await collectArtifacts(tempDest, tempDest);
+  await ensureTitlesInDir(tempDest);
+  await writeFile(join(tempDest, 'index.mdx'), renderPreviewPage(source.label, artifacts), 'utf-8');
+  await mkdir(dest, { recursive: true });
+  await cp(tempDest, dest, { recursive: true, force: true });
+  await pruneMissingEntries(tempDest, dest);
+  await rm(tempDest, { recursive: true, force: true });
+}
+
+async function removeStaleProjectDirs(activeSlugs) {
+  let entries;
+  try {
+    entries = await readdir(docsBase, { withFileTypes: true });
+  } catch {
+    return;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name.endsWith('.__sync__') || entry.name.endsWith('.__old__')) {
+      await rm(join(docsBase, entry.name), { recursive: true, force: true });
+      continue;
+    }
+    if (activeSlugs.has(entry.name)) continue;
+    await rm(join(docsBase, entry.name), { recursive: true, force: true });
+  }
+}
+
+let ok = 0;
+let skip = 0;
+const activeSlugs = new Set(docsSources.map((source) => source.slug));
+
+await removeStaleProjectDirs(activeSlugs);
+
+for (const source of docsSources) {
+  try {
+    await syncProjectSource(source);
+    console.log(`Synced ${source.label}`);
+    ok++;
+  } catch (error) {
+    console.warn(`Skipped ${source.label}: ${error.message}`);
+    skip++;
+  }
+}
+
+console.log(`Documentation collection complete. Success: ${ok}, Skipped: ${skip}`);

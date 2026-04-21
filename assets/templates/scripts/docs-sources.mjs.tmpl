@@ -1,0 +1,33 @@
+import { readdirSync } from 'fs';
+import { join } from 'path';
+
+export const PROJECTS_ROOT = '__PROJECTS_ROOT__';
+export const IGNORED_PROJECT_NAMES = new Set([
+  '__HUB_REPO_NAME__',
+  '_starlight-template',
+]);
+
+export function slugifySegment(value) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'project';
+}
+
+export function discoverDocsSources(root = PROJECTS_ROOT) {
+  return readdirSync(root, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .filter((entry) => !IGNORED_PROJECT_NAMES.has(entry.name))
+    .filter((entry) => !entry.name.startsWith('.'))
+    .map((entry) => ({
+      src: join(root, entry.name),
+      slug: slugifySegment(entry.name),
+      label: entry.name,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+export const docsSources = discoverDocsSources();
