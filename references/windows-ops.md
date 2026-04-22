@@ -42,3 +42,4 @@ Register-ScheduledTask -TaskName '__TASK_NAME__' -Action $action -Trigger $trigg
 - Use `npm.cmd` on Windows to avoid shell alias issues.
 - Restart the dev server after large structural changes if the browser still shows stale content.
 - If a watcher task is already running, `launch-watch-docs.ps1` should exit cleanly because of its mutex.
+- If you are changing the reusable skill itself, run `scripts/self-test.ps1` before treating the update as complete.

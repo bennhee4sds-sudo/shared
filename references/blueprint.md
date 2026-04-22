@@ -26,6 +26,7 @@ Replace these placeholders in template files:
 
 - Scan direct child folders under the projects root.
 - Ignore the hub repo, `_starlight-template`, hidden folders, and build folders.
+- Use `String.raw` for injected Windows absolute paths in template output so backslashes do not break the generated script.
 - Mirror Markdown, PDFs, images, videos, diagrams, and common office artifacts.
 - Generate one hidden `index.mdx` preview page per project so the sidebar shows only real docs.
 - Add frontmatter titles to Markdown files when missing.
@@ -66,3 +67,7 @@ Apply templates in this order:
 7. `src/content/docs/index.mdx`
 
 Run `npm.cmd run collect` after copying the templates.
+
+## Maintenance Note
+
+For reusable skill maintenance, keep one working hub repo as the canonical implementation and sync template changes from that source only after the fix is confirmed there.

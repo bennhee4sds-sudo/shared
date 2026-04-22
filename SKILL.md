@@ -20,6 +20,7 @@ Use this skill when the user wants a reusable preview hub that reflects project 
 4. Ensure the target `package.json` includes `collect`, `sync:docs`, and `watch:docs` scripts as described in the blueprint.
 5. Run `npm.cmd run collect`, then start the site with `npm.cmd run dev -- --host`.
 6. If the user wants background automation, use [references/windows-ops.md](references/windows-ops.md) to register the watcher as a scheduled task.
+7. When maintaining the reusable skill itself, use [references/maintenance.md](references/maintenance.md) and run [scripts/self-test.ps1](scripts/self-test.ps1) before reporting the packaging update as complete.
 
 ## Required Behaviors
 
@@ -37,4 +38,5 @@ Use this skill when the user wants a reusable preview hub that reflects project 
 
 - Architecture and file responsibilities: [references/blueprint.md](references/blueprint.md)
 - Windows setup and operations: [references/windows-ops.md](references/windows-ops.md)
+- Maintenance and anti-regression workflow: [references/maintenance.md](references/maintenance.md)
 - Ready-to-copy templates: [assets/templates](assets/templates)

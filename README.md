@@ -119,6 +119,31 @@ The templates and instructions cover:
 - watcher-based sync with fallback full sync interval
 - scheduled-task-friendly watcher launch flow
 
+## Preventing Regression
+
+This skill now includes a maintainer self-test and a canonical-source workflow so fixes are less likely to drift or regress.
+
+- Use one working hub repo as the canonical implementation.
+- Apply fixes there first.
+- Sync the matching change into the templates.
+- Run the included self-test before publishing the updated skill.
+
+Maintainer self-test:
+
+```powershell
+cd <skill-repo>
+powershell -ExecutionPolicy Bypass -File .\scripts\self-test.ps1 `
+  -CanonicalHubRepo C:\Users\<your-user>\Projects\docs-hub `
+  -ProjectsRoot C:\Users\<your-user>\Projects
+```
+
+What the self-test checks:
+- skill structural validation when the validator is available
+- template application into a fresh temporary hub repo
+- `npm.cmd run collect`
+- `npm.cmd run build`
+- actual mirrored output generation
+
 ## Files Included
 
 - `SKILL.md`
@@ -127,6 +152,10 @@ The templates and instructions cover:
   - architecture and behavior rules
 - `references/windows-ops.md`
   - local run and Windows scheduled task guidance
+- `references/maintenance.md`
+  - maintainer workflow for syncing fixes and preventing template drift
+- `scripts/self-test.ps1`
+  - maintainer end-to-end validation script for installation and runtime checks
 - `assets/templates/...`
   - ready-to-copy templates for:
   - `astro.config.mjs`
