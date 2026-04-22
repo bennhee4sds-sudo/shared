@@ -71,7 +71,6 @@ function getEncodingScore(value) {
     hangul: countMatches(value, /[\uac00-\ud7a3]/g),
     replacement: countMatches(value, /\uFFFD/g),
     questionJunk: countMatches(value, /\?[^\s]/g),
-    weirdCjk: countMatches(value, /[留泥諛곌꼍媛怨좉컼]/g),
   };
 }
 
@@ -81,8 +80,8 @@ function chooseBestDecoding(buffer) {
   const utf8Score = getEncodingScore(utf8);
   const eucKrScore = getEncodingScore(eucKr);
 
-  const utf8Penalty = (utf8Score.replacement * 4) + (utf8Score.questionJunk * 2) + utf8Score.weirdCjk;
-  const eucKrPenalty = (eucKrScore.replacement * 4) + (eucKrScore.questionJunk * 2) + eucKrScore.weirdCjk;
+  const utf8Penalty = (utf8Score.replacement * 4) + (utf8Score.questionJunk * 2);
+  const eucKrPenalty = (eucKrScore.replacement * 4) + (eucKrScore.questionJunk * 2);
   const utf8Value = (utf8Score.hangul * 3) - utf8Penalty;
   const eucKrValue = (eucKrScore.hangul * 3) - eucKrPenalty;
 
@@ -94,7 +93,7 @@ function chooseBestDecoding(buffer) {
 }
 
 function looksBrokenKorean(value) {
-  return /�|\?[^\s]|[留泥諛곌꼍媛怨좉컼]/.test(value);
+  return /\uFFFD|\?[^\s]/.test(value);
 }
 
 async function readTextFileNormalized(filePath) {
