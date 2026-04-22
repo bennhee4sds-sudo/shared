@@ -1,46 +1,124 @@
 # Project Preview Hub Skill
 
-This skill packages the working pattern used to create and maintain a Starlight-based Project Preview Hub on Windows.
+This repository contains a reusable Codex skill for creating and repairing a Windows-based Project Preview Hub.
 
-## Purpose
+The hub mirrors project folders into a Starlight site so teammates can preview project artifacts such as:
+- Markdown documents
+- images and SVG diagrams
+- PDFs
+- wireframes
+- ERDs
+- personas
+- customer journeys
+- decks, sheets, and related delivery artifacts
 
-Use this skill when you want to:
-- create a new Project Preview Hub
-- repair an existing preview hub
-- add auto-sync from a projects root
-- support preview of Markdown, images, PDFs, diagrams, wireframes, personas, customer journeys, and related deliverables
+## Quick Start
 
-## Included
+1. Clone this repository locally.
+2. Copy this repository into your local Codex skills folder as `project-preview-hub`.
+3. Validate the skill.
+4. Ask Codex to use `project-preview-hub` when creating or repairing a preview hub.
 
-- `SKILL.md`
-  - trigger and workflow guidance
-- `references/blueprint.md`
-  - architecture, required files, behavior rules
-- `references/windows-ops.md`
-  - local run, watcher, scheduled task usage
-- `assets/templates/...`
-  - ready-to-copy template files for:
-    - `astro.config.mjs`
-    - `scripts/docs-sources.mjs`
-    - `scripts/collect-docs.mjs`
-    - `scripts/sync-docs.ps1`
-    - `scripts/watch-docs.ps1`
-    - `scripts/launch-watch-docs.ps1`
-    - `src/content/docs/index.mdx`
+## Install From GitHub
 
-## What The Templates Handle
+Clone the repository:
 
+```powershell
+cd $HOME\Projects
+git clone https://github.com/bennhee4sds-sudo/shared.git
+```
+
+If you already have it:
+
+```powershell
+cd $HOME\Projects\shared
+git pull
+```
+
+## Copy Into Local Codex Skills Folder
+
+Codex loads local skills from `$HOME\.codex\skills`.
+
+Copy this repository into that folder with the required skill name:
+
+```powershell
+New-Item -ItemType Directory -Force -Path $HOME\.codex\skills | Out-Null
+Remove-Item -LiteralPath $HOME\.codex\skills\project-preview-hub -Recurse -Force -ErrorAction SilentlyContinue
+Copy-Item -LiteralPath $HOME\Projects\shared -Destination $HOME\.codex\skills\project-preview-hub -Recurse
+```
+
+After copying, the main file should exist here:
+
+```text
+C:\Users\<your-user>\.codex\skills\project-preview-hub\SKILL.md
+```
+
+## Validate The Skill
+
+If Python is installed, validate with:
+
+```powershell
+& "$HOME\AppData\Local\Programs\Python\Python312\python.exe" `
+  "$HOME\.codex\skills\.system\skill-creator\scripts\quick_validate.py" `
+  "$HOME\.codex\skills\project-preview-hub"
+```
+
+Expected result:
+
+```text
+Skill is valid!
+```
+
+## How To Use The Skill
+
+In Codex, ask for the skill explicitly. Example prompts:
+
+```text
+Use project-preview-hub to create a new preview hub for C:\Users\me\Projects
+```
+
+```text
+Use project-preview-hub to repair my existing docs-hub repo
+```
+
+```text
+Use project-preview-hub to add auto-sync and scheduled task support
+```
+
+## What This Skill Sets Up
+
+The templates and instructions cover:
 - dynamic project folder discovery
 - artifact mirroring into `src/content/docs/<slug>/`
 - hidden project overview page generation
-- Korean text normalization with UTF-8 and EUC-KR/CP949 fallback
+- UTF-8 normalization with EUC-KR/CP949 fallback for Korean Markdown
 - Windows-safe sync behavior for add, update, delete, and rename cases
-- temp sync work outside `src/content/docs` so Astro does not import transient `.__sync__` paths
-- asset-first, Markdown-second copy order to reduce `ImageNotFound` races during live preview refresh
+- temp sync work outside `src/content/docs` so Astro does not import transient temp paths
+- asset-first, Markdown-second copy order to reduce `ImageNotFound` races
 - watcher-based sync with fallback full sync interval
-- scheduled task friendly watcher launch flow
+- scheduled-task-friendly watcher launch flow
+
+## Files Included
+
+- `SKILL.md`
+  - main skill instructions
+- `references/blueprint.md`
+  - architecture and behavior rules
+- `references/windows-ops.md`
+  - local run and Windows scheduled task guidance
+- `assets/templates/...`
+  - ready-to-copy templates for:
+  - `astro.config.mjs`
+  - `scripts/docs-sources.mjs`
+  - `scripts/collect-docs.mjs`
+  - `scripts/sync-docs.ps1`
+  - `scripts/watch-docs.ps1`
+  - `scripts/launch-watch-docs.ps1`
+  - `src/content/docs/index.mdx`
 
 ## Placeholders To Replace
+
+When Codex applies the templates to a target repo, these placeholders must be replaced:
 
 - `__PROJECTS_ROOT__`
 - `__HUB_REPO_NAME__`
@@ -48,16 +126,9 @@ Use this skill when you want to:
 - `__SITE_URL__`
 - `__TASK_NAME__`
 
-## Typical Usage
+## Typical Hub Runtime Commands
 
-1. Create or prepare a Starlight repo.
-2. Copy the template files from `assets/templates`.
-3. Replace the placeholders with environment-specific values.
-4. Ensure `package.json` includes:
-   - `collect`
-   - `sync:docs`
-   - `watch:docs`
-5. Run:
+After the hub repo is created:
 
 ```powershell
 cd <hub-repo>
@@ -66,19 +137,22 @@ npm.cmd run collect
 npm.cmd run dev -- --host
 ```
 
-## Validation
+## Troubleshooting
 
-If Python and `PyYAML` are available, validate with:
+If the preview looks stale after major structural changes:
 
 ```powershell
-& "C:\Users\keumsik.im\AppData\Local\Programs\Python\Python312\python.exe" `
-  "C:\Users\keumsik.im\.codex\skills\.system\skill-creator\scripts\quick_validate.py" `
-  "<path-to-skill>"
+cd <hub-repo>
+Ctrl+C
+Remove-Item -LiteralPath .\.astro -Recurse -Force
+$env:ASTRO_TELEMETRY_DISABLED='1'
+npm.cmd run dev -- --host
 ```
+
+This is especially helpful when an older hub previously used temp sync folders inside `src/content/docs` and stale generated imports remain in `.astro`.
 
 ## Notes
 
 - This skill was built from a working local Project Preview Hub implementation.
-- The templates are optimized for Windows + PowerShell + `npm.cmd`.
-- If browser content looks stale after major structural changes, restart the dev server once.
-- If a hub previously used in-content temp sync folders and now shows `Could not import /.astro/content-assets.mjs` or stale `ImageNotFound` errors, clear `.astro` once and restart the dev server.
+- The templates are optimized for Windows, PowerShell, and `npm.cmd`.
+- The repository name is `shared`, but the installed local skill folder name should be `project-preview-hub`.
