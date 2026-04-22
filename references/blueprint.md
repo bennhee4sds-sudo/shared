@@ -33,8 +33,10 @@ Replace these placeholders in template files:
 - Read Markdown with UTF-8 first, but prefer EUC-KR/CP949 when that yields better Korean text.
 - Write normalized Markdown back as UTF-8.
 - During sync, do not clear `.astro`; dev server imports depend on it.
-- During collection on Windows, copy into a temp folder, copy temp contents into the destination, prune stale files, then remove the temp folder.
+- During collection on Windows, copy into a temp folder outside `src/content/docs`, copy temp contents into the destination, prune stale files, then remove the temp folder.
+- Copy non-Markdown assets into the destination before Markdown files so updated docs do not reference assets that have not been copied yet.
 - Auto-sync should watch the entire projects root and run a fallback full sync on a timer.
+- If a hub previously used temp folders inside `src/content/docs`, one manual `.astro` clear and dev-server restart may be needed to flush stale generated imports.
 
 ## package.json Scripts
 

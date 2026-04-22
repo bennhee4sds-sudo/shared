@@ -35,6 +35,8 @@ Use this skill when you want to:
 - hidden project overview page generation
 - Korean text normalization with UTF-8 and EUC-KR/CP949 fallback
 - Windows-safe sync behavior for add, update, delete, and rename cases
+- temp sync work outside `src/content/docs` so Astro does not import transient `.__sync__` paths
+- asset-first, Markdown-second copy order to reduce `ImageNotFound` races during live preview refresh
 - watcher-based sync with fallback full sync interval
 - scheduled task friendly watcher launch flow
 
@@ -79,3 +81,4 @@ If Python and `PyYAML` are available, validate with:
 - This skill was built from a working local Project Preview Hub implementation.
 - The templates are optimized for Windows + PowerShell + `npm.cmd`.
 - If browser content looks stale after major structural changes, restart the dev server once.
+- If a hub previously used in-content temp sync folders and now shows `Could not import /.astro/content-assets.mjs` or stale `ImageNotFound` errors, clear `.astro` once and restart the dev server.

@@ -28,8 +28,10 @@ Use this skill when the user wants a reusable preview hub that reflects project 
 - Generate a hidden project `index.mdx` preview page per project.
 - Normalize Markdown text to UTF-8 during collection and prefer valid Korean decoding when source files are CP949/EUC-KR.
 - Avoid deleting `.astro` during sync.
-- On Windows, do not rely on renaming a live destination directory during sync. Build into a temp directory, copy into the destination, then prune removed files.
+- On Windows, do not rely on renaming a live destination directory during sync. Build into a temp directory outside `src/content/docs`, copy into the destination, then prune removed files.
+- Copy non-Markdown assets before Markdown files so image and PDF references are already present when Astro re-imports updated docs.
 - Keep preview sync robust for add, update, delete, and project-folder rename cases.
+- If older temp-dir logic was previously used, document that one manual `.astro` clear and dev-server restart may be needed to flush stale `.__sync__` imports.
 
 ## Resources
 

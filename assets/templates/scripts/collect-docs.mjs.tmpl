@@ -1,10 +1,11 @@
 import { cp, mkdir, readFile, writeFile, readdir, rm, stat } from 'fs/promises';
-import { join, dirname, basename, relative } from 'path';
+import { join, dirname, basename, relative, extname } from 'path';
 import { fileURLToPath } from 'url';
 import { docsSources } from './docs-sources.mjs';
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 const docsBase = join(projectRoot, '..', 'src', 'content', 'docs');
+const tempBase = join(projectRoot, '..', '.preview-sync-temp');
 const utf8Decoder = new TextDecoder('utf-8', { fatal: false });
 const eucKrDecoder = new TextDecoder('euc-kr', { fatal: false });
 const imageExtensions = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp']);
@@ -221,6 +222,11 @@ async function pruneMissingEntries(sourceDir, targetDir) {
   }
 }
 
+function isMarkdownPath(filePath) {
+  const extension = extname(filePath).toLowerCase();
+  return extension === '.md' || extension === '.mdx';
+}
+
 function renderPreviewPage(label, artifacts) {
   const markdownFiles = artifacts.filter((artifact) => artifact.isMarkdown);
   const imageFiles = artifacts.filter((artifact) => artifact.isImage).slice(0, 12);
@@ -306,9 +312,10 @@ function renderPreviewPage(label, artifacts) {
 
 async function syncProjectSource(source) {
   const dest = join(docsBase, source.slug);
-  const tempDest = join(docsBase, `${source.slug}.__sync__`);
+  const tempDest = join(tempBase, source.slug);
   await stat(source.src);
   await mkdir(dirname(dest), { recursive: true });
+  await mkdir(tempBase, { recursive: true });
   await rm(tempDest, { recursive: true, force: true });
 
   await cp(source.src, tempDest, {
@@ -322,7 +329,16 @@ async function syncProjectSource(source) {
   await ensureTitlesInDir(tempDest);
   await writeFile(join(tempDest, 'index.mdx'), renderPreviewPage(source.label, artifacts), 'utf-8');
   await mkdir(dest, { recursive: true });
-  await cp(tempDest, dest, { recursive: true, force: true });
+  await cp(tempDest, dest, {
+    recursive: true,
+    force: true,
+    filter: (entryPath) => !isMarkdownPath(entryPath),
+  });
+  await cp(tempDest, dest, {
+    recursive: true,
+    force: true,
+    filter: (entryPath) => isMarkdownPath(entryPath) || extname(entryPath) === '',
+  });
   await pruneMissingEntries(tempDest, dest);
   await rm(tempDest, { recursive: true, force: true });
 }
@@ -349,6 +365,8 @@ async function removeStaleProjectDirs(activeSlugs) {
 let ok = 0;
 let skip = 0;
 const activeSlugs = new Set(docsSources.map((source) => source.slug));
+
+await rm(tempBase, { recursive: true, force: true });
 
 await removeStaleProjectDirs(activeSlugs);
 
