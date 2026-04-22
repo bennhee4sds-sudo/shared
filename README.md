@@ -19,6 +19,27 @@ The hub mirrors project folders into a Starlight site so teammates can preview p
 3. Validate the skill.
 4. Ask Codex to use `project-preview-hub` when creating or repairing a preview hub.
 
+## Install In 60 Seconds
+
+If you already have Git and Python, this is the shortest path:
+
+```powershell
+cd $HOME\Projects
+git clone https://github.com/bennhee4sds-sudo/shared.git
+New-Item -ItemType Directory -Force -Path $HOME\.codex\skills | Out-Null
+Remove-Item -LiteralPath $HOME\.codex\skills\project-preview-hub -Recurse -Force -ErrorAction SilentlyContinue
+Copy-Item -LiteralPath $HOME\Projects\shared -Destination $HOME\.codex\skills\project-preview-hub -Recurse
+& "$HOME\AppData\Local\Programs\Python\Python312\python.exe" `
+  "$HOME\.codex\skills\.system\skill-creator\scripts\quick_validate.py" `
+  "$HOME\.codex\skills\project-preview-hub"
+```
+
+Then use a prompt like:
+
+```text
+Use project-preview-hub to create a preview hub for C:\Users\me\Projects
+```
+
 ## Install From GitHub
 
 Clone the repository:
@@ -150,6 +171,41 @@ npm.cmd run dev -- --host
 ```
 
 This is especially helpful when an older hub previously used temp sync folders inside `src/content/docs` and stale generated imports remain in `.astro`.
+
+## FAQ
+
+### Do I install the repo as `shared` or `project-preview-hub`?
+
+Clone the GitHub repository as `shared` if you want, but copy it into your local Codex skills folder using the folder name `project-preview-hub`.
+
+### Where does Codex look for the skill?
+
+Codex looks under:
+
+```text
+C:\Users\<your-user>\.codex\skills\project-preview-hub
+```
+
+### Do I need to edit the template files by hand?
+
+Usually no. The skill is meant to guide Codex to apply the templates and replace placeholders in the target hub repo.
+
+### When should I clear `.astro`?
+
+Only when the preview shows stale import errors such as:
+- `Could not import /.astro/content-assets.mjs`
+- `ImageNotFound` after a sync structure change
+
+### What kinds of files can this preview hub handle?
+
+It is designed for common project artifacts such as:
+- Markdown and MDX
+- images and SVGs
+- PDFs
+- ERDs and diagram files
+- wireframes and design artifacts
+- personas and customer journey files
+- office documents and related delivery materials
 
 ## Notes
 
