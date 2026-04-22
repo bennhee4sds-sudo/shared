@@ -17,8 +17,8 @@ Use this skill when the user wants a reusable preview hub that reflects project 
    - `__HUB_TITLE__`
    - `__SITE_URL__`
    - `__TASK_NAME__`
-4. Ensure the target `package.json` includes `collect`, `sync:docs`, and `watch:docs` scripts as described in the blueprint.
-5. Run `npm.cmd run collect`, then start the site with `npm.cmd run dev -- --host`.
+4. Ensure the target `package.json` includes `collect`, `preflight`, `sync:docs`, and `watch:docs` scripts as described in the blueprint.
+5. Run `powershell -ExecutionPolicy Bypass -File .\scripts\preflight.ps1`, then start the site with `npm.cmd run dev -- --host`.
 6. If the user wants background automation, use [references/windows-ops.md](references/windows-ops.md) to register the watcher as a scheduled task.
 7. When maintaining the reusable skill itself, use [references/maintenance.md](references/maintenance.md) and run [scripts/self-test.ps1](scripts/self-test.ps1) before reporting the packaging update as complete.
 
@@ -29,10 +29,12 @@ Use this skill when the user wants a reusable preview hub that reflects project 
 - Generate a hidden project `index.mdx` preview page per project.
 - Normalize Markdown text to UTF-8 during collection and prefer valid Korean decoding when source files are CP949/EUC-KR.
 - Avoid deleting `.astro` during sync.
+- Keep local preview update success separate from GitHub push success unless the user explicitly wants strict remote-delivery failure handling.
 - On Windows, do not rely on renaming a live destination directory during sync. Build into a temp directory outside `src/content/docs`, copy into the destination, then prune removed files.
 - Copy non-Markdown assets before Markdown files so image and PDF references are already present when Astro re-imports updated docs.
 - Keep preview sync robust for add, update, delete, and project-folder rename cases.
 - If older temp-dir logic was previously used, document that one manual `.astro` clear and dev-server restart may be needed to flush stale `.__sync__` imports.
+- Add a runtime preflight path so config, CSS, collect, and build regressions are checked before treating operational changes as complete.
 
 ## Resources
 

@@ -1,0 +1,78 @@
+[CmdletBinding()]
+param(
+    [switch]$SkipCollect,
+    [switch]$SkipBuild
+)
+
+$ErrorActionPreference = "Stop"
+$repoRoot = Split-Path -Parent $PSScriptRoot
+
+function Write-Step {
+    param([string]$Message)
+    Write-Host "[preflight] $Message" -ForegroundColor Cyan
+}
+
+function Invoke-Step {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$Arguments
+    )
+
+    & $FilePath @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Command failed with exit code ${LASTEXITCODE}: $FilePath $($Arguments -join ' ')"
+    }
+}
+
+function Assert-PathExists {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$Label
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        throw "$Label not found: $Path"
+    }
+}
+
+Set-Location $repoRoot
+$env:ASTRO_TELEMETRY_DISABLED = "1"
+
+Write-Step "Checking required runtime files"
+$requiredFiles = @(
+    @{ Label = "Astro config"; Path = (Join-Path $repoRoot "astro.config.mjs") }
+    @{ Label = "Docs source script"; Path = (Join-Path $repoRoot "scripts\docs-sources.mjs") }
+    @{ Label = "Collect script"; Path = (Join-Path $repoRoot "scripts\collect-docs.mjs") }
+    @{ Label = "Preflight script"; Path = (Join-Path $repoRoot "scripts\preflight.ps1") }
+    @{ Label = "Sync script"; Path = (Join-Path $repoRoot "scripts\sync-docs.ps1") }
+    @{ Label = "Watch script"; Path = (Join-Path $repoRoot "scripts\watch-docs.ps1") }
+    @{ Label = "Home docs page"; Path = (Join-Path $repoRoot "src\content\docs\index.mdx") }
+)
+
+foreach ($item in $requiredFiles) {
+    Assert-PathExists -Path $item.Path -Label $item.Label
+}
+
+$astroConfig = Get-Content -Raw (Join-Path $repoRoot "astro.config.mjs")
+$cssMatches = [regex]::Matches($astroConfig, "/src/[^'`"]+\.css")
+foreach ($match in $cssMatches) {
+    $relativePath = $match.Value.TrimStart('/')
+    Assert-PathExists -Path (Join-Path $repoRoot $relativePath) -Label "customCss asset"
+}
+
+if (-not $SkipCollect) {
+    Write-Step "Running collect"
+    Invoke-Step npm.cmd run collect
+}
+
+if (-not $SkipBuild) {
+    Write-Step "Running build"
+    Invoke-Step npm.cmd run build
+}
+
+Write-Step "Preflight passed"

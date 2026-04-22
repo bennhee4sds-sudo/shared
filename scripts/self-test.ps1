@@ -179,6 +179,7 @@ $templatePairs = @(
     @{ Template = 'astro.config.mjs.tmpl'; Target = 'astro.config.mjs' }
     @{ Template = 'scripts\docs-sources.mjs.tmpl'; Target = 'scripts\docs-sources.mjs' }
     @{ Template = 'scripts\collect-docs.mjs.tmpl'; Target = 'scripts\collect-docs.mjs' }
+    @{ Template = 'scripts\preflight.ps1.tmpl'; Target = 'scripts\preflight.ps1' }
     @{ Template = 'scripts\sync-docs.ps1.tmpl'; Target = 'scripts\sync-docs.ps1' }
     @{ Template = 'scripts\watch-docs.ps1.tmpl'; Target = 'scripts\watch-docs.ps1' }
     @{ Template = 'scripts\launch-watch-docs.ps1.tmpl'; Target = 'scripts\launch-watch-docs.ps1' }
@@ -206,12 +207,12 @@ else {
 Write-Step "Installing test repo dependencies"
 Invoke-CheckedCommand -FilePath 'npm.cmd' -ArgumentList @('install') -WorkingDirectory $testRepoRoot
 
-Write-Step "Running collect"
-Invoke-CheckedCommand -FilePath 'npm.cmd' -ArgumentList @('run', 'collect') -WorkingDirectory $testRepoRoot
+Write-Step "Running preflight"
+Invoke-CheckedCommand -FilePath 'powershell' -ArgumentList @('-ExecutionPolicy', 'Bypass', '-File', '.\scripts\preflight.ps1') -WorkingDirectory $testRepoRoot
 
 $mirroredDocsRoot = Join-Path $testRepoRoot 'src\content\docs'
 if (-not (Test-Path $mirroredDocsRoot)) {
-    throw "Collect did not create src/content/docs"
+    throw "Preflight did not create src/content/docs"
 }
 
 $mirroredProjects = Get-ChildItem -Path $mirroredDocsRoot -Directory -ErrorAction Stop
@@ -232,11 +233,6 @@ finally {
     else {
         $env:ASTRO_TELEMETRY_DISABLED = $previousTelemetry
     }
-}
-
-$distIndex = Join-Path $testRepoRoot 'dist\index.html'
-if (-not (Test-Path $distIndex)) {
-    throw "Build completed but dist/index.html was not created."
 }
 
 $sampleAsset = Join-Path $testRepoRoot 'src\content\docs\p001-biz-health-dashboard\PROJECT_ORG_CHART.svg'

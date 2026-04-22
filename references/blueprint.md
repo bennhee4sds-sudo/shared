@@ -7,6 +7,7 @@ This skill packages the working structure used for a Windows-based Starlight pre
 - `astro.config.mjs`
 - `scripts/docs-sources.mjs`
 - `scripts/collect-docs.mjs`
+- `scripts/preflight.ps1`
 - `scripts/sync-docs.ps1`
 - `scripts/watch-docs.ps1`
 - `scripts/launch-watch-docs.ps1`
@@ -34,10 +35,12 @@ Replace these placeholders in template files:
 - Read Markdown with UTF-8 first, but prefer EUC-KR/CP949 when that yields better Korean text.
 - Write normalized Markdown back as UTF-8.
 - During sync, do not clear `.astro`; dev server imports depend on it.
+- Local preview sync should not be treated as failed only because GitHub push failed. Remote delivery failure should be reported without breaking the local sync result unless strict failure is explicitly required.
 - During collection on Windows, copy into a temp folder outside `src/content/docs`, copy temp contents into the destination, prune stale files, then remove the temp folder.
 - Copy non-Markdown assets into the destination before Markdown files so updated docs do not reference assets that have not been copied yet.
 - Auto-sync should watch the entire projects root and run a fallback full sync on a timer.
 - If a hub previously used temp folders inside `src/content/docs`, one manual `.astro` clear and dev-server restart may be needed to flush stale generated imports.
+- Add a runtime preflight script that checks required files, validates referenced custom CSS assets, and runs `collect` plus `build` before operational changes are treated as complete.
 
 ## package.json Scripts
 
@@ -46,6 +49,7 @@ Ensure the target repo includes these scripts:
 ```json
 {
   "collect": "node ./scripts/collect-docs.mjs",
+  "preflight": "powershell -ExecutionPolicy Bypass -File ./scripts/preflight.ps1",
   "sync:docs": "powershell -ExecutionPolicy Bypass -File ./scripts/sync-docs.ps1",
   "watch:docs": "powershell -ExecutionPolicy Bypass -File ./scripts/watch-docs.ps1",
   "dev": "astro dev",
@@ -60,13 +64,14 @@ Apply templates in this order:
 
 1. `scripts/docs-sources.mjs`
 2. `scripts/collect-docs.mjs`
-3. `scripts/sync-docs.ps1`
-4. `scripts/watch-docs.ps1`
-5. `scripts/launch-watch-docs.ps1`
-6. `astro.config.mjs`
-7. `src/content/docs/index.mdx`
+3. `scripts/preflight.ps1`
+4. `scripts/sync-docs.ps1`
+5. `scripts/watch-docs.ps1`
+6. `scripts/launch-watch-docs.ps1`
+7. `astro.config.mjs`
+8. `src/content/docs/index.mdx`
 
-Run `npm.cmd run collect` after copying the templates.
+Run `npm.cmd run preflight` after copying the templates.
 
 ## Maintenance Note
 

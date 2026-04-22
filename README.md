@@ -140,8 +140,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\self-test.ps1 `
 What the self-test checks:
 - skill structural validation when the validator is available
 - template application into a fresh temporary hub repo
-- `npm.cmd run collect`
-- `npm.cmd run build`
+- `powershell -ExecutionPolicy Bypass -File .\scripts\preflight.ps1`
 - actual mirrored output generation
 
 ## Files Included
@@ -156,11 +155,14 @@ What the self-test checks:
   - maintainer workflow for syncing fixes and preventing template drift
 - `scripts/self-test.ps1`
   - maintainer end-to-end validation script for installation and runtime checks
+- `assets/templates/scripts/preflight.ps1.tmpl`
+  - runtime preflight template for file checks, collect, and build verification
 - `assets/templates/...`
   - ready-to-copy templates for:
   - `astro.config.mjs`
   - `scripts/docs-sources.mjs`
   - `scripts/collect-docs.mjs`
+  - `scripts/preflight.ps1`
   - `scripts/sync-docs.ps1`
   - `scripts/watch-docs.ps1`
   - `scripts/launch-watch-docs.ps1`
@@ -183,9 +185,17 @@ After the hub repo is created:
 ```powershell
 cd <hub-repo>
 $env:ASTRO_TELEMETRY_DISABLED='1'
-npm.cmd run collect
+powershell -ExecutionPolicy Bypass -File .\scripts\preflight.ps1
 npm.cmd run dev -- --host
 ```
+
+## Sync Behavior
+
+The generated sync flow is designed so local preview updates are not treated as failed only because GitHub push failed.
+
+- local collect and commit should still complete
+- push failure should be reported clearly
+- strict failure on push should only be used when that behavior is explicitly desired
 
 ## Troubleshooting
 

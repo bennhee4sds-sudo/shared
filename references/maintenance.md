@@ -26,8 +26,7 @@ Use [scripts/self-test.ps1](../scripts/self-test.ps1) before treating a reusable
 The self-test is meant to verify:
 - the skill can be structurally validated when the validator is available
 - a fresh test hub can be assembled from the templates
-- `npm.cmd run collect` succeeds
-- `npm.cmd run build` succeeds
+- `powershell -ExecutionPolicy Bypass -File .\scripts\preflight.ps1` succeeds
 - mirrored project content is actually produced
 
 Typical command:
@@ -45,6 +44,7 @@ Before reporting a reusable skill update as complete:
 - confirm the canonical hub repo contains the intended fix
 - sync the matching change into the templates
 - run `self-test.ps1`
+- confirm local runtime sync and GitHub push behavior are not incorrectly coupled when that separation matters
 - confirm the README still matches the actual install and usage flow
 - sync the updated skill to the local Codex skill path
 - sync the updated skill to the shared GitHub repository

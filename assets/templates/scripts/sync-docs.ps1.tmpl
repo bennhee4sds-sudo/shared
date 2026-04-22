@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$CommitMessagePrefix = "preview: sync",
-    [switch]$SkipPush
+    [switch]$SkipPush,
+    [switch]$FailOnPushError
 )
 
 $ErrorActionPreference = "Stop"
@@ -68,7 +69,16 @@ Invoke-Step git commit -m $commitMessage
 
 if (-not $SkipPush) {
     Write-Host "[preview-sync] Pushing to origin/main..." -ForegroundColor Cyan
-    Invoke-Step git push
+    try {
+        Invoke-Step git push
+    }
+    catch {
+        if ($FailOnPushError) {
+            throw
+        }
+
+        Write-Warning "[preview-sync] Push failed, but local sync and commit were completed. $($_.Exception.Message)"
+    }
 }
 
 Write-Host "[preview-sync] Done." -ForegroundColor Green
