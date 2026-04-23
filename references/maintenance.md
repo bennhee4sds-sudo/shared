@@ -44,6 +44,8 @@ Before reporting a reusable skill update as complete:
 - confirm the canonical hub repo contains the intended fix
 - sync the matching change into the templates
 - run `self-test.ps1`
+- run or smoke-test `install-local-skill.ps1` with a temporary `-CodexHome` when install behavior changes
+- run or smoke-test `update-local-skill.ps1` with a manifest when update behavior changes
 - confirm local runtime sync and GitHub push behavior are not incorrectly coupled when that separation matters
 - confirm the README still matches the actual install and usage flow
 - sync the updated skill to the local Codex skill path

@@ -20,7 +20,9 @@ Use this skill when the user wants a reusable preview hub that reflects project 
 4. Ensure the target `package.json` includes `collect`, `preflight`, `sync:docs`, and `watch:docs` scripts as described in the blueprint.
 5. Run `powershell -ExecutionPolicy Bypass -File .\scripts\preflight.ps1`, then start the site with `npm.cmd run dev -- --host`.
 6. If the user wants background automation, use [references/windows-ops.md](references/windows-ops.md) to register the watcher as a scheduled task.
-7. When maintaining the reusable skill itself, use [references/maintenance.md](references/maintenance.md) and run [scripts/self-test.ps1](scripts/self-test.ps1) before reporting the packaging update as complete.
+7. For teammate installation of this skill, prefer [scripts/install-local-skill.ps1](scripts/install-local-skill.ps1). It writes `.local/install-manifest.json` so environment-specific paths survive future updates.
+8. If the teammate wants skill auto-update, use [scripts/register-skill-auto-update.ps1](scripts/register-skill-auto-update.ps1). The updater must read the local manifest, back up the existing skill, validate the candidate update, and preserve the existing skill on failure.
+9. When maintaining the reusable skill itself, use [references/maintenance.md](references/maintenance.md) and run [scripts/self-test.ps1](scripts/self-test.ps1) before reporting the packaging update as complete.
 
 ## Required Behaviors
 
@@ -35,10 +37,16 @@ Use this skill when the user wants a reusable preview hub that reflects project 
 - Keep preview sync robust for add, update, delete, and project-folder rename cases.
 - If older temp-dir logic was previously used, document that one manual `.astro` clear and dev-server restart may be needed to flush stale `.__sync__` imports.
 - Add a runtime preflight path so config, CSS, collect, and build regressions are checked before treating operational changes as complete.
+- Install the skill with a local `.local/install-manifest.json` when distributing it to teammates.
+- Preserve `.local/install-manifest.json` during updates so customized B-environment paths are not overwritten by shared A-environment defaults.
+- Automatic skill updates must be safe-by-default: pull latest shared content, stage to a temp folder, validate, back up the existing local skill, then replace only after validation succeeds.
 
 ## Resources
 
 - Architecture and file responsibilities: [references/blueprint.md](references/blueprint.md)
 - Windows setup and operations: [references/windows-ops.md](references/windows-ops.md)
 - Maintenance and anti-regression workflow: [references/maintenance.md](references/maintenance.md)
+- Local install script: [scripts/install-local-skill.ps1](scripts/install-local-skill.ps1)
+- Local update script: [scripts/update-local-skill.ps1](scripts/update-local-skill.ps1)
+- Auto-update registration script: [scripts/register-skill-auto-update.ps1](scripts/register-skill-auto-update.ps1)
 - Ready-to-copy templates: [assets/templates](assets/templates)

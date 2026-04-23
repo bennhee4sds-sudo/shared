@@ -9,6 +9,33 @@ npm.cmd run preflight
 npm.cmd run dev -- --host
 ```
 
+## Skill Install And Auto-Update
+
+Install the skill with the installer instead of manually copying files:
+
+```powershell
+cd <shared-repo>
+powershell -ExecutionPolicy Bypass -File .\scripts\install-local-skill.ps1
+```
+
+The installer creates `.local\install-manifest.json` in the installed skill folder. This manifest preserves environment-specific paths for future updates.
+
+Register automatic skill updates:
+
+```powershell
+cd <shared-repo>
+powershell -ExecutionPolicy Bypass -File .\scripts\register-skill-auto-update.ps1
+```
+
+Manual update:
+
+```powershell
+cd <shared-repo>
+powershell -ExecutionPolicy Bypass -File .\scripts\update-local-skill.ps1
+```
+
+The updater should validate the candidate skill before replacing the installed skill. If validation fails, keep the existing skill.
+
 ## Runtime Preflight
 
 ```powershell

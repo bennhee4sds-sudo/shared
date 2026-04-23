@@ -26,12 +26,8 @@ If you already have Git and Python, this is the shortest path:
 ```powershell
 cd $HOME\Projects
 git clone https://github.com/bennhee4sds-sudo/shared.git
-New-Item -ItemType Directory -Force -Path $HOME\.codex\skills | Out-Null
-Remove-Item -LiteralPath $HOME\.codex\skills\project-preview-hub -Recurse -Force -ErrorAction SilentlyContinue
-Copy-Item -LiteralPath $HOME\Projects\shared -Destination $HOME\.codex\skills\project-preview-hub -Recurse
-& "$HOME\AppData\Local\Programs\Python\Python312\python.exe" `
-  "$HOME\.codex\skills\.system\skill-creator\scripts\quick_validate.py" `
-  "$HOME\.codex\skills\project-preview-hub"
+cd $HOME\Projects\shared
+powershell -ExecutionPolicy Bypass -File .\scripts\install-local-skill.ps1
 ```
 
 Then use a prompt like:
@@ -60,18 +56,55 @@ git pull
 
 Codex loads local skills from `$HOME\.codex\skills`.
 
-Copy this repository into that folder with the required skill name:
+Use the installer. It copies this repository into the required skill name and writes a local manifest:
 
 ```powershell
-New-Item -ItemType Directory -Force -Path $HOME\.codex\skills | Out-Null
-Remove-Item -LiteralPath $HOME\.codex\skills\project-preview-hub -Recurse -Force -ErrorAction SilentlyContinue
-Copy-Item -LiteralPath $HOME\Projects\shared -Destination $HOME\.codex\skills\project-preview-hub -Recurse
+cd $HOME\Projects\shared
+powershell -ExecutionPolicy Bypass -File .\scripts\install-local-skill.ps1
 ```
 
 After copying, the main file should exist here:
 
 ```text
 C:\Users\<your-user>\.codex\skills\project-preview-hub\SKILL.md
+```
+
+The installer also creates:
+
+```text
+C:\Users\<your-user>\.codex\skills\project-preview-hub\.local\install-manifest.json
+```
+
+The manifest records local environment values such as `codexHome`, `skillPath`, `sharedRepoPath`, `pythonPath`, and `gitPath`. Future updates read this file so a teammate who installed in a different B-environment keeps that B-environment during updates.
+
+## Enable Automatic Skill Updates
+
+After the first install, register the safe updater:
+
+```powershell
+cd $HOME\Projects\shared
+powershell -ExecutionPolicy Bypass -File .\scripts\register-skill-auto-update.ps1
+```
+
+The scheduled task runs at logon and daily at `09:00` by default.
+
+The updater:
+- reads `.local\install-manifest.json`
+- runs `git pull` in the shared repo
+- prepares the new skill in a temp folder
+- validates the candidate skill when the validator is available
+- backs up the existing local skill
+- replaces the installed skill only after validation succeeds
+- preserves `.local\install-manifest.json`
+- writes logs under `.local\logs`
+
+If validation, Git, Python, permissions, or network access fail, the updater leaves the existing installed skill in place.
+
+To update manually:
+
+```powershell
+cd $HOME\Projects\shared
+powershell -ExecutionPolicy Bypass -File .\scripts\update-local-skill.ps1
 ```
 
 ## Validate The Skill
@@ -147,6 +180,8 @@ What the self-test checks:
 
 - `SKILL.md`
   - main skill instructions
+- `VERSION`
+  - distributed skill version marker
 - `references/blueprint.md`
   - architecture and behavior rules
 - `references/windows-ops.md`
@@ -155,6 +190,12 @@ What the self-test checks:
   - maintainer workflow for syncing fixes and preventing template drift
 - `scripts/self-test.ps1`
   - maintainer end-to-end validation script for installation and runtime checks
+- `scripts/install-local-skill.ps1`
+  - teammate installer that creates `.local/install-manifest.json`
+- `scripts/update-local-skill.ps1`
+  - manifest-aware safe updater
+- `scripts/register-skill-auto-update.ps1`
+  - Windows scheduled task registration for automatic skill updates
 - `assets/templates/scripts/preflight.ps1.tmpl`
   - runtime preflight template for file checks, collect, and build verification
 - `assets/templates/...`
