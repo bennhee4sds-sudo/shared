@@ -7,6 +7,7 @@ const projectRoot = dirname(fileURLToPath(import.meta.url));
 const docsBase = join(projectRoot, '..', 'src', 'content', 'docs');
 const tempBase = join(projectRoot, '..', '.preview-sync-temp');
 const utf8Decoder = new TextDecoder('utf-8', { fatal: false });
+const utf8StrictDecoder = new TextDecoder('utf-8', { fatal: true });
 const eucKrDecoder = new TextDecoder('euc-kr', { fatal: false });
 const imageExtensions = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp']);
 const videoExtensions = new Set(['.mp4', '.webm', '.mov']);
@@ -75,21 +76,25 @@ function getEncodingScore(value) {
 }
 
 function chooseBestDecoding(buffer) {
-  const utf8 = stripBom(utf8Decoder.decode(buffer));
-  const eucKr = stripBom(eucKrDecoder.decode(buffer));
-  const utf8Score = getEncodingScore(utf8);
-  const eucKrScore = getEncodingScore(eucKr);
+  try {
+    return { text: stripBom(utf8StrictDecoder.decode(buffer)), encoding: 'utf-8' };
+  } catch {
+    const utf8 = stripBom(utf8Decoder.decode(buffer));
+    const eucKr = stripBom(eucKrDecoder.decode(buffer));
+    const utf8Score = getEncodingScore(utf8);
+    const eucKrScore = getEncodingScore(eucKr);
 
-  const utf8Penalty = (utf8Score.replacement * 4) + (utf8Score.questionJunk * 2);
-  const eucKrPenalty = (eucKrScore.replacement * 4) + (eucKrScore.questionJunk * 2);
-  const utf8Value = (utf8Score.hangul * 3) - utf8Penalty;
-  const eucKrValue = (eucKrScore.hangul * 3) - eucKrPenalty;
+    const utf8Penalty = (utf8Score.replacement * 4) + (utf8Score.questionJunk * 2);
+    const eucKrPenalty = (eucKrScore.replacement * 4) + (eucKrScore.questionJunk * 2);
+    const utf8Value = (utf8Score.hangul * 3) - utf8Penalty;
+    const eucKrValue = (eucKrScore.hangul * 3) - eucKrPenalty;
 
-  if (eucKrValue > utf8Value + 3) {
-    return { text: eucKr, encoding: 'euc-kr' };
+    if (eucKrValue > utf8Value + 3) {
+      return { text: eucKr, encoding: 'euc-kr' };
+    }
+
+    return { text: utf8, encoding: 'utf-8' };
   }
-
-  return { text: utf8, encoding: 'utf-8' };
 }
 
 function looksBrokenKorean(value) {
