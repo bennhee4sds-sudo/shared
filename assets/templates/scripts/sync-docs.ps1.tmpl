@@ -40,8 +40,22 @@ function Get-CommandOutput {
     return ($result | Out-String).Trim()
 }
 
+function Test-WatcherHealthy {
+    $watchLog = Join-Path $repoRoot "logs\watch-docs.log"
+    if (-not (Test-Path -LiteralPath $watchLog)) {
+        Write-Warning "[preview-sync] watch-docs.log was not found. Auto-sync may not be running."
+        return
+    }
+
+    $age = (Get-Date) - (Get-Item -LiteralPath $watchLog).LastWriteTime
+    if ($age.TotalMinutes -gt 10) {
+        Write-Warning "[preview-sync] watch-docs.log has not been updated in the last 10 minutes. Verify the scheduled watcher is running."
+    }
+}
+
 Set-Location $repoRoot
 $env:ASTRO_TELEMETRY_DISABLED = "1"
+Test-WatcherHealthy
 
 Write-Host "[preview-sync] Collecting project artifacts..." -ForegroundColor Cyan
 Invoke-Step npm.cmd run collect

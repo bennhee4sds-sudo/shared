@@ -18,7 +18,7 @@ Use this skill when the user wants a reusable preview hub that reflects project 
    - `__SITE_URL__`
    - `__TASK_NAME__`
 4. Ensure the target `package.json` includes `collect`, `preflight`, `sync:docs`, and `watch:docs` scripts as described in the blueprint.
-5. Run `powershell -ExecutionPolicy Bypass -File .\scripts\preflight.ps1`, then start the site with `npm.cmd run dev -- --host`.
+5. Run `powershell -ExecutionPolicy Bypass -File .\scripts\preflight.ps1`, optionally confirm the fixed port with `npm.cmd run check:port`, then start the site with `npm.cmd run dev -- --host`.
 6. If the user wants background automation, use [references/windows-ops.md](references/windows-ops.md) to register the watcher as a scheduled task.
 7. For teammate installation of this skill, prefer [scripts/install-local-skill.ps1](scripts/install-local-skill.ps1). It writes `.local/install-manifest.json` so environment-specific paths survive future updates.
 8. If the teammate wants skill auto-update, use [scripts/register-skill-auto-update.ps1](scripts/register-skill-auto-update.ps1). The updater must read the local manifest, back up the existing skill, validate the candidate update, and preserve the existing skill on failure.

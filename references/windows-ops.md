@@ -6,6 +6,7 @@
 cd <hub-repo>
 $env:ASTRO_TELEMETRY_DISABLED='1'
 npm.cmd run preflight
+npm.cmd run check:port
 npm.cmd run dev -- --host
 ```
 
@@ -74,6 +75,7 @@ Register-ScheduledTask -TaskName '__TASK_NAME__' -Action $action -Trigger $trigg
 ## Notes
 
 - Use `npm.cmd` on Windows to avoid shell alias issues.
+- Use `npm.cmd run check:port` when you want an explicit fixed-port readiness check before starting the hub.
 - Restart the dev server after large structural changes if the browser still shows stale content.
 - If a watcher task is already running, `launch-watch-docs.ps1` should exit cleanly because of its mutex.
 - If you are changing the reusable skill itself, run `scripts/self-test.ps1` before treating the update as complete.

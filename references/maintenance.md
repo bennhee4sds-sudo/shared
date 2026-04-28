@@ -34,7 +34,7 @@ Typical command:
 ```powershell
 cd <skill-repo>
 powershell -ExecutionPolicy Bypass -File .\scripts\self-test.ps1 `
-  -CanonicalHubRepo C:\Users\<user>\Projects\docs-hub `
+  -CanonicalHubRepo C:\Users\<user>\Projects\P002_project-preview-hub `
   -ProjectsRoot C:\Users\<user>\Projects
 ```
 

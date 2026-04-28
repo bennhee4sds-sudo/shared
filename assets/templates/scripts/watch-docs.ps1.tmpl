@@ -15,6 +15,7 @@ $ignoredPrefixes = @(
 )
 
 $script:pendingSync = $false
+$script:syncInProgress = $false
 $script:lastEventAt = Get-Date
 $script:lastFullSyncAt = Get-Date
 $watchers = @()
@@ -82,9 +83,23 @@ Write-Host "[preview-watch] Project Preview Hub auto-sync is running. Press Ctrl
 Write-Host "[preview-watch] A fallback full sync will run every $FullSyncIntervalMinutes minute(s)." -ForegroundColor DarkGray
 
 function Invoke-PreviewSync {
+    if ($script:syncInProgress) {
+        Write-Host "[preview-watch] Sync already in progress. Skipping overlapping request." -ForegroundColor DarkYellow
+        return
+    }
+
+    $script:syncInProgress = $true
     Write-Host "[preview-watch] Syncing project artifacts..." -ForegroundColor Cyan
-    powershell -ExecutionPolicy Bypass -File $syncScript -CommitMessagePrefix $CommitMessagePrefix
-    $script:lastFullSyncAt = Get-Date
+    try {
+        powershell -ExecutionPolicy Bypass -File $syncScript -CommitMessagePrefix $CommitMessagePrefix
+        if ($LASTEXITCODE -ne 0) {
+            throw "sync-docs.ps1 exited with code $LASTEXITCODE"
+        }
+        $script:lastFullSyncAt = Get-Date
+    }
+    finally {
+        $script:syncInProgress = $false
+    }
 }
 
 Invoke-PreviewSync

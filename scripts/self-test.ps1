@@ -126,14 +126,14 @@ $templatesRoot = Join-Path $skillRepoRoot 'assets\templates'
 $defaultProjectsRoot = Split-Path -Parent $skillRepoRoot
 
 if (-not $CanonicalHubRepo) {
-    $candidate = Join-Path $defaultProjectsRoot 'docs-hub'
+    $candidate = Join-Path $defaultProjectsRoot 'P002_project-preview-hub'
     if (Test-Path $candidate) {
         $CanonicalHubRepo = $candidate
     }
 }
 
 if (-not $CanonicalHubRepo) {
-    throw "CanonicalHubRepo is required when docs-hub is not present beside the skill repository."
+    throw "CanonicalHubRepo is required when P002_project-preview-hub is not present beside the skill repository."
 }
 
 if (-not (Test-Path $CanonicalHubRepo)) {
@@ -180,6 +180,7 @@ $templatePairs = @(
     @{ Template = 'scripts\docs-sources.mjs.tmpl'; Target = 'scripts\docs-sources.mjs' }
     @{ Template = 'scripts\collect-docs.mjs.tmpl'; Target = 'scripts\collect-docs.mjs' }
     @{ Template = 'scripts\preflight.ps1.tmpl'; Target = 'scripts\preflight.ps1' }
+    @{ Template = 'scripts\preview-guard.ps1.tmpl'; Target = 'scripts\preview-guard.ps1' }
     @{ Template = 'scripts\sync-docs.ps1.tmpl'; Target = 'scripts\sync-docs.ps1' }
     @{ Template = 'scripts\watch-docs.ps1.tmpl'; Target = 'scripts\watch-docs.ps1' }
     @{ Template = 'scripts\launch-watch-docs.ps1.tmpl'; Target = 'scripts\launch-watch-docs.ps1' }

@@ -40,6 +40,84 @@ function Assert-PathExists {
     }
 }
 
+function Get-DocsSources {
+    $json = & node --input-type=module -e "import { docsSources } from './scripts/docs-sources.mjs'; console.log(JSON.stringify(docsSources));"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to load docs sources from scripts/docs-sources.mjs"
+    }
+
+    return ($json | ConvertFrom-Json)
+}
+
+function Get-LatestProjectFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $null
+    }
+
+    $excludedNames = @('.git', '.astro', '.next', '.nuxt', '.turbo', '.vscode', '.idea', 'node_modules', 'dist', 'build', 'coverage', 'out', 'tmp', 'temp')
+    $files = Get-ChildItem -LiteralPath $Path -Recurse -File -ErrorAction SilentlyContinue | Where-Object {
+        $segments = [regex]::Split($_.FullName, '[\\/]')
+        -not ($segments | Where-Object { $_ -in $excludedNames })
+    } | Sort-Object LastWriteTime -Descending
+
+    return $files | Select-Object -First 1
+}
+
+function Write-PortStatus {
+    param([int]$Port)
+
+    $listeners = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+    if ($listeners) {
+        $owner = $listeners | Select-Object -First 1
+        $process = Get-Process -Id $owner.OwningProcess -ErrorAction SilentlyContinue
+        $name = if ($process) { $process.ProcessName } else { 'unknown' }
+        Write-Warning "[preflight] Preview port $Port is currently occupied by PID $($owner.OwningProcess) [$name]. The dev server start guard will block reuse until that process is stopped."
+        return
+    }
+
+    Write-Host "[preflight] Preview port $Port is available." -ForegroundColor Green
+}
+
+function Assert-MirrorsFresh {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$DocsSources
+    )
+
+    $staleEntries = @()
+    foreach ($source in $DocsSources) {
+        $sourcePath = [string]$source.src
+        $slug = [string]$source.slug
+        $mirrorPath = Join-Path $repoRoot "src\content\docs\$slug"
+        $latestSource = Get-LatestProjectFile -Path $sourcePath
+        $latestMirror = Get-LatestProjectFile -Path $mirrorPath
+
+        if ($null -eq $latestSource) {
+            continue
+        }
+
+        if ($null -eq $latestMirror -or $latestMirror.LastWriteTime -lt $latestSource.LastWriteTime) {
+            $staleEntries += [pscustomobject]@{
+                Label = [string]$source.label
+                SourceTime = $latestSource.LastWriteTime
+                MirrorTime = if ($latestMirror) { $latestMirror.LastWriteTime } else { $null }
+            }
+        }
+    }
+
+    if ($staleEntries.Count -gt 0) {
+        $details = $staleEntries | ForEach-Object {
+            "$($_.Label): source=$($_.SourceTime.ToString('yyyy-MM-dd HH:mm:ss')), mirror=$(if ($_.MirrorTime) { $_.MirrorTime.ToString('yyyy-MM-dd HH:mm:ss') } else { 'missing' })"
+        }
+        throw "Mirror freshness check failed:`n$($details -join "`n")"
+    }
+}
+
 Set-Location $repoRoot
 $env:ASTRO_TELEMETRY_DISABLED = "1"
 
@@ -49,6 +127,7 @@ $requiredFiles = @(
     @{ Label = "Docs source script"; Path = (Join-Path $repoRoot "scripts\docs-sources.mjs") }
     @{ Label = "Collect script"; Path = (Join-Path $repoRoot "scripts\collect-docs.mjs") }
     @{ Label = "Preflight script"; Path = (Join-Path $repoRoot "scripts\preflight.ps1") }
+    @{ Label = "Preview guard script"; Path = (Join-Path $repoRoot "scripts\preview-guard.ps1") }
     @{ Label = "Sync script"; Path = (Join-Path $repoRoot "scripts\sync-docs.ps1") }
     @{ Label = "Watch script"; Path = (Join-Path $repoRoot "scripts\watch-docs.ps1") }
     @{ Label = "Home docs page"; Path = (Join-Path $repoRoot "src\content\docs\index.mdx") }
@@ -65,10 +144,18 @@ foreach ($match in $cssMatches) {
     Assert-PathExists -Path (Join-Path $repoRoot $relativePath) -Label "customCss asset"
 }
 
+Write-Step "Checking fixed preview port"
+Write-PortStatus -Port 4322
+
+$docsSources = @(Get-DocsSources)
+
 if (-not $SkipCollect) {
     Write-Step "Running collect"
     Invoke-Step npm.cmd run collect
 }
+
+Write-Step "Verifying mirror freshness"
+Assert-MirrorsFresh -DocsSources $docsSources
 
 if (-not $SkipBuild) {
     Write-Step "Running build"

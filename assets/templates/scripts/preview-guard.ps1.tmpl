@@ -1,0 +1,59 @@
+[CmdletBinding()]
+param(
+    [ValidateSet('dev', 'preview', 'port-only')]
+    [string]$Mode = 'port-only',
+    [int]$Port = 4322,
+    [string]$HostName = '0.0.0.0'
+)
+
+$ErrorActionPreference = "Stop"
+$repoRoot = Split-Path -Parent $PSScriptRoot
+
+function Get-PortOwner {
+    param([int]$LocalPort)
+
+    $listeners = Get-NetTCPConnection -LocalPort $LocalPort -State Listen -ErrorAction SilentlyContinue
+    if (-not $listeners) {
+        return $null
+    }
+
+    $owner = $listeners | Select-Object -First 1
+    $process = Get-Process -Id $owner.OwningProcess -ErrorAction SilentlyContinue
+
+    [pscustomobject]@{
+        Port = $LocalPort
+        ProcessId = $owner.OwningProcess
+        ProcessName = if ($process) { $process.ProcessName } else { 'unknown' }
+        Path = if ($process) { $process.Path } else { $null }
+    }
+}
+
+function Assert-PortAvailable {
+    param([int]$LocalPort)
+
+    $owner = Get-PortOwner -LocalPort $LocalPort
+    if ($null -ne $owner) {
+        $pathText = if ([string]::IsNullOrWhiteSpace($owner.Path)) { '' } else { " ($($owner.Path))" }
+        throw "Preview Hub requires port $LocalPort, but it is already occupied by PID $($owner.ProcessId) [$($owner.ProcessName)]$pathText"
+    }
+}
+
+Set-Location $repoRoot
+$env:ASTRO_TELEMETRY_DISABLED = "1"
+
+Assert-PortAvailable -LocalPort $Port
+
+if ($Mode -eq 'port-only') {
+    Write-Host "[preview-guard] Port $Port is available." -ForegroundColor Green
+    exit 0
+}
+
+$astroCli = Join-Path $repoRoot "node_modules\.bin\astro.cmd"
+if (-not (Test-Path -LiteralPath $astroCli)) {
+    throw "Astro CLI not found: $astroCli"
+}
+
+$arguments = @($Mode, '--host', $HostName, '--port', "$Port", '--strictPort')
+Write-Host "[preview-guard] Starting Astro $Mode on http://localhost:$Port/" -ForegroundColor Cyan
+& $astroCli @arguments
+exit $LASTEXITCODE

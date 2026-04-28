@@ -8,6 +8,7 @@ This skill packages the working structure used for a Windows-based Starlight pre
 - `scripts/docs-sources.mjs`
 - `scripts/collect-docs.mjs`
 - `scripts/preflight.ps1`
+- `scripts/preview-guard.ps1`
 - `scripts/sync-docs.ps1`
 - `scripts/watch-docs.ps1`
 - `scripts/launch-watch-docs.ps1`
@@ -40,7 +41,8 @@ Replace these placeholders in template files:
 - Copy non-Markdown assets into the destination before Markdown files so updated docs do not reference assets that have not been copied yet.
 - Auto-sync should watch the entire projects root and run a fallback full sync on a timer.
 - If a hub previously used temp folders inside `src/content/docs`, one manual `.astro` clear and dev-server restart may be needed to flush stale generated imports.
-- Add a runtime preflight script that checks required files, validates referenced custom CSS assets, and runs `collect` plus `build` before operational changes are treated as complete.
+- Add a runtime preflight script that checks required files, validates referenced custom CSS assets, reports preview port status, verifies mirror freshness, and runs `collect` plus `build` before operational changes are treated as complete.
+- Guard the fixed preview port with a startup script so `4322` is either used by the hub or fails loudly before Astro starts.
 
 ## package.json Scripts
 
@@ -50,11 +52,12 @@ Ensure the target repo includes these scripts:
 {
   "collect": "node ./scripts/collect-docs.mjs",
   "preflight": "powershell -ExecutionPolicy Bypass -File ./scripts/preflight.ps1",
+  "check:port": "powershell -ExecutionPolicy Bypass -File ./scripts/preview-guard.ps1 -Mode port-only",
   "sync:docs": "powershell -ExecutionPolicy Bypass -File ./scripts/sync-docs.ps1",
   "watch:docs": "powershell -ExecutionPolicy Bypass -File ./scripts/watch-docs.ps1",
-  "dev": "astro dev",
+  "dev": "powershell -ExecutionPolicy Bypass -File ./scripts/preview-guard.ps1 -Mode dev",
   "build": "astro build",
-  "preview": "astro preview"
+  "preview": "powershell -ExecutionPolicy Bypass -File ./scripts/preview-guard.ps1 -Mode preview"
 }
 ```
 
@@ -65,11 +68,12 @@ Apply templates in this order:
 1. `scripts/docs-sources.mjs`
 2. `scripts/collect-docs.mjs`
 3. `scripts/preflight.ps1`
-4. `scripts/sync-docs.ps1`
-5. `scripts/watch-docs.ps1`
-6. `scripts/launch-watch-docs.ps1`
-7. `astro.config.mjs`
-8. `src/content/docs/index.mdx`
+4. `scripts/preview-guard.ps1`
+5. `scripts/sync-docs.ps1`
+6. `scripts/watch-docs.ps1`
+7. `scripts/launch-watch-docs.ps1`
+8. `astro.config.mjs`
+9. `src/content/docs/index.mdx`
 
 Run `npm.cmd run preflight` after copying the templates.
 

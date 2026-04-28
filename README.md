@@ -2,6 +2,11 @@
 
 This repository contains a reusable Codex skill for creating and repairing a Windows-based Project Preview Hub.
 
+Canonical source note:
+- The working source of truth is maintained in `C:\Users\keumsik.im\Projects\P002_project-preview-hub`.
+- The reusable skill package working copy is maintained in `C:\Users\keumsik.im\Projects\P002_project-preview-hub\skill-package`.
+- This `shared` repository remains the GitHub distribution channel used for teammate installation and updates.
+
 The hub mirrors project folders into a Starlight site so teammates can preview project artifacts such as:
 - Markdown documents
 - images and SVG diagrams
@@ -132,7 +137,7 @@ Use project-preview-hub to create a new preview hub for C:\Users\me\Projects
 ```
 
 ```text
-Use project-preview-hub to repair my existing docs-hub repo
+Use project-preview-hub to repair my existing P002_project-preview-hub repo
 ```
 
 ```text
@@ -166,7 +171,7 @@ Maintainer self-test:
 ```powershell
 cd <skill-repo>
 powershell -ExecutionPolicy Bypass -File .\scripts\self-test.ps1 `
-  -CanonicalHubRepo C:\Users\<your-user>\Projects\docs-hub `
+  -CanonicalHubRepo C:\Users\<your-user>\Projects\P002_project-preview-hub `
   -ProjectsRoot C:\Users\<your-user>\Projects
 ```
 
@@ -227,6 +232,7 @@ After the hub repo is created:
 cd <hub-repo>
 $env:ASTRO_TELEMETRY_DISABLED='1'
 powershell -ExecutionPolicy Bypass -File .\scripts\preflight.ps1
+npm.cmd run check:port
 npm.cmd run dev -- --host
 ```
 
@@ -251,6 +257,9 @@ npm.cmd run dev -- --host
 ```
 
 This is especially helpful when an older hub previously used temp sync folders inside `src/content/docs` and stale generated imports remain in `.astro`.
+
+The generated hub is expected to use `http://localhost:4322` as its fixed local preview address. The Astro config uses a strict port so startup fails clearly if another process is already occupying `4322`.
+The generated preflight also verifies mirror freshness so stale preview content is surfaced before you treat the hub as up to date.
 
 ## FAQ
 

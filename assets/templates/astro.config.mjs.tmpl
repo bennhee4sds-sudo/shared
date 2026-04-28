@@ -5,6 +5,14 @@ import { docsSources } from './scripts/docs-sources.mjs';
 
 export default defineConfig({
   site: '__SITE_URL__',
+  server: {
+    host: true,
+    port: 4322,
+  },
+  preview: {
+    host: true,
+    port: 4322,
+  },
   integrations: [
     starlight({
       title: '__HUB_TITLE__',
