@@ -1,0 +1,82 @@
+# Windows Ops
+
+## Local Run
+
+```powershell
+cd <hub-repo>
+$env:ASTRO_TELEMETRY_DISABLED='1'
+npm.cmd run preflight
+npm.cmd run check:port
+npm.cmd run dev -- --host
+```
+
+## Skill Install And Auto-Update
+
+Install the skill with the installer instead of manually copying files:
+
+```powershell
+cd <shared-repo>
+powershell -ExecutionPolicy Bypass -File .\scripts\install-local-skill.ps1
+```
+
+The installer creates `.local\install-manifest.json` in the installed skill folder. This manifest preserves environment-specific paths for future updates.
+
+Register automatic skill updates:
+
+```powershell
+cd <shared-repo>
+powershell -ExecutionPolicy Bypass -File .\scripts\register-skill-auto-update.ps1
+```
+
+Manual update:
+
+```powershell
+cd <shared-repo>
+powershell -ExecutionPolicy Bypass -File .\scripts\update-local-skill.ps1
+```
+
+The updater should validate the candidate skill before replacing the installed skill. If validation fails, keep the existing skill.
+
+## Runtime Preflight
+
+```powershell
+cd <hub-repo>
+powershell -ExecutionPolicy Bypass -File .\scripts\preflight.ps1
+```
+
+## One-Time Sync
+
+```powershell
+cd <hub-repo>
+powershell -ExecutionPolicy Bypass -File .\scripts\sync-docs.ps1
+```
+
+## Watcher
+
+```powershell
+cd <hub-repo>
+powershell -ExecutionPolicy Bypass -File .\scripts\watch-docs.ps1
+```
+
+## Scheduled Task
+
+Recommended task name: `__TASK_NAME__`
+
+Typical registration command:
+
+```powershell
+$repoRoot = '<hub-repo>'
+$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$repoRoot\scripts\launch-watch-docs.ps1`""
+$trigger = New-ScheduledTaskTrigger -AtLogOn
+$principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
+Register-ScheduledTask -TaskName '__TASK_NAME__' -Action $action -Trigger $trigger -Principal $principal
+```
+
+## Notes
+
+- Use `npm.cmd` on Windows to avoid shell alias issues.
+- Use `npm.cmd run check:port` when you want an explicit fixed-port readiness check before starting the hub.
+- Restart the dev server after large structural changes if the browser still shows stale content.
+- If a watcher task is already running, `launch-watch-docs.ps1` should exit cleanly because of its mutex.
+- If you are changing the reusable skill itself, run `scripts/self-test.ps1` before treating the update as complete.
+- If GitHub push fails during sync, local preview should still be considered updated if collect, commit, and local files completed successfully.
